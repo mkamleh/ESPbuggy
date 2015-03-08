@@ -13,9 +13,11 @@
 //#define FLEFTdetected       PORTJbits.RJ0
 //#define LEFTdetected        PORTJbits.RJ1
 //#define STRAIGHT1detected   PORTJbits.RJ2
-//#define STRAIGHT2detected   PORTJbits.RJ3
-//#define RIGHTdetected       PORTJbits.RJ4
-//#define FRIGHTdetected      PORTJbits.RJ5
+///*#define STRAIGHT2detected   PORTJbits.RJ3     */
+//#define RIGHTdetected       PORTJbits.RJ3
+//#define FRIGHTdetected      PORTJbits.RJ4
+
+//RG3 & RG4 <= speed sensing
 
 //for test purposes only, remove and uncomment previous for tech demo
 #define FLEFTdetected       PORTHbits.RH7
@@ -36,6 +38,7 @@ volatile char TIMER1, TIMER3;
 unsigned char pattern [] = {0x84, 0xf5, 0x4c, 0x64, 0x35, 0x26, 0x06, 0xf4, 
                         0x04, 0x34, 0x14, 0x04, 0x8E, 0x84, 0x0E, 0x1E, 0xFF};
 unsigned char speed_K;
+unsigned char pwm;
 
 //******************************************************************************
 // Function Prototypes
@@ -50,15 +53,39 @@ void dispos(void);
 //unsigned char calc_speed_right(void);
 //unsigned char calc_speed_left(void);
 void sensors_init(void);
+void motors_init(void);
+void motors_drive(void);
+
 
 //******************************************************************************
 // Functions for tests
 //******************************************************************************
 
 void test_init(void){
-    TRISBbits.RB0 = 1;
+    TRISBbits.RB0 = 1;          //PB2
     TRISH = 0xFF;
     TRISC = 0xFF;
+}
+
+void display_timer(unsigned int dtimer){
+    LATF = dtimer;
+    
+}
+
+void display_mode(void){
+    if(TRISCbits.RC2==1){                       //switch bit0
+        dispos();                               //show sensors
+        LATF = convert_dispos(buggy_turn);
+        return ;
+    }
+    else if(TRISCbits.RC3==1){          //switch bit1
+        LATF = TIMER1;                  //show timer1
+    }
+    else if(TRISCbits.RC4==1){          //switch bit2
+        LATF = TIMER3;                  //show timer3
+    }
+
+
 }
 
 //******************************************************************************
@@ -73,8 +100,8 @@ void main(void){
 
     while(1){
 
-        dispos();
-        LATF = convert_dispos(buggy_turn);
+        display_mode();
+
 
     }
 }
@@ -86,12 +113,12 @@ void main(void){
 
 void init_demonstration(void){
 
-    TRISF = 0x00;              //LEDs outputs
-    LATF = 0x00;               //clear LEDs
-    TRISHbits.RH0 = 0;      //U1 enabled
-    TRISHbits.RH1 = 0;      //U2 enabled
-    LATHbits.LATH0 = 1;     //off
-    LATHbits.LATH1 = 1;     //off
+    TRISF = 0x00;            //LEDs outputs
+    LATF = 0x00;             //clear LEDs
+    TRISHbits.RH0 = 0;       //U1 enabled
+    TRISHbits.RH1 = 0;       //U2 enabled
+    LATHbits.LATH0 = 1;      //off
+    LATHbits.LATH1 = 1;      //off
 }
 
 unsigned char convert_dispos(enum turn turned){
@@ -169,7 +196,18 @@ void dispos(void){
 //unsigned char calc_speed_left(void){
 //    return (60/(N*TIMER1));
 //}
+void motors_init(void){
+	LATG=0X03;				//ENABLE,unipolar,BI
+	LATE=0X05;				//DIRECTION1 AND 2
+	OpenPWM4(248);			//frequency of 10k
+	OpenPWM5(248);
+	OpenTimer2( TIMER_INT_OFF & T2_PS_1_1 );
+}
 
+void motors_drive(){
+	SetDCPWM4();
+	SetDCPWM5();
+}
 
 void sensors_init(void){
     CCP4CON = 0b0101;     //CCP4 Capture mode for speed, rising edge
