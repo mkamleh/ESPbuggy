@@ -2,7 +2,7 @@
  * MAIN is here
  *
  * to add: motor pwm rotation and its control by adc to demonstrate speed conversion
- *
+ * atm code is adapted for tech demo 3
  */
 
 
@@ -10,22 +10,14 @@
 #include "adc.h"
 #include "delays.h"
 
-#define FLEFTdetected       PORTEbits.RE0
-#define LEFTdetected        PORTEbits.RE1
-#define STRAIGHT1detected   PORTEbits.RE2
-/*#define STRAIGHT2detected   PORTJbits.RJ3     */
-#define RIGHTdetected       PORTEbits.RE3
-#define FRIGHTdetected      PORTEbits.RE4
+//#define FLEFTdetected       PORTEbits.RE0
+#define LEFTd           PORTEbits.RE1
+#define STRd            PORTEbits.RE2
+#define RIGHTd          PORTEbits.RE3
+//#define FRIGHTdetected      PORTEbits.RE4
 
 //RC2 & RG0 <= speed sensing
-
-//for test purposes only, remove and uncomment previous for tech demo
-//#define FLEFTdetected       PORTHbits.RH7
-//#define LEFTdetected        PORTHbits.RH6
-//#define STRAIGHT1detected   PORTHbits.RH5
-//#define STRAIGHT2detected   PORTHbits.RH4
-//#define RIGHTdetected       PORTCbits.RC5
-//#define FRIGHTdetected      PORTCbits.RC4
+//white line == 1; black == 0;
 
 //******************************************************************************
 // Global Variables
@@ -46,12 +38,10 @@ unsigned char pwm;
 
 void init_demonstration(void);
 unsigned char convert_dispos(enum turn turned);
-unsigned char convert_speed(unsigned char speed);
+//unsigned char convert_speed(unsigned char speed);
 void configure_ADC(void);
 unsigned int get_ADC_value(void);
 void dispos(void);
-//unsigned char calc_speed_right(void);
-//unsigned char calc_speed_left(void);
 void sensors_init(void);
 void motors_init(void);
 void motors_drive(void);
@@ -61,11 +51,6 @@ void motors_drive(void);
 // Functions for tests
 //******************************************************************************
 
-//void test_init(void){
-//    TRISBbits.RB0 = 1;          //PB2
-//    TRISH = 0xFF;
-//    TRISC = 0xFF;
-//}
 
 void display_timer(unsigned int dtimer){
     LATF = dtimer;
@@ -73,22 +58,24 @@ void display_timer(unsigned int dtimer){
 }
 
 void display_mode(void){
-    if(PORTCbits.RC3==1){                       //switch bit1
+    if(PORTHbits.RH7 == 1){                       //sw bit7
         dispos();                               //show sensors
         LATF = convert_dispos(buggy_turn);
         return ;
     }
-    else if(PORTCbits.RC4==1){          //switch bit2
-        LATF = TIMER1;                  //show timer1
-        return ;
-    }
-    else if(PORTCbits.RC5==1){          //switch bit3
-        LATF = TIMER3;                  //show timer3
-        return ;
-    }
-    else if(PORTHbits.RH4==1){          //switch bit4, change motor speed
+    else if(PORTHbits.RH6 == 1){          //switch bit4, change motor speed
 
+        return ;
     }
+    else if(PORTHbits.RH5 == 1){          //switch bit2
+        LATF = TIMER1;                    //show timer1
+        return ;
+    }
+    else if(PORTHbits.RH4 == 1){          //switch bit3
+        LATF = TIMER3;                    //show timer3
+        return ;
+    }
+
 
 
 }
@@ -102,7 +89,6 @@ void main(void){
     motors_init();
     sensors_init();
     init_demonstration();
-    //test_init();
 
     while(1){
 
@@ -125,31 +111,30 @@ void init_demonstration(void){
     TRISHbits.RH1 = 0;       //U2 enabled
     LATHbits.LATH0 = 1;      //off
     LATHbits.LATH1 = 1;      //off
-    TRISC = 0xFF;           //outputs for sw
+    TRISC = 0xFF;           //outputs for sw; RC2 for ECCP interrupt speed
     TRISH = 0xFF;           //outputs for sw
 
 }
 
 unsigned char convert_dispos(enum turn turned){
-    if (turned==FLEFT)
+    if (turned == FLEFT)
         return 0b11000000;
-    else if (turned==LEFT)
+    else if (turned == LEFT)
         return 0b01100000;
-    else if (turned==STRAIGHT)
+    else if (turned == STRAIGHT)
         return 0b00011000;
-    else if (turned==fullSTRAIGHT)
-        return 0b00111100;
-    else if (turned==RIGHT)
+    else if (turned == RIGHT)
         return 0b00000110;
-    else if (turned==FRIGHT)
+    else if (turned == FRIGHT)
         return 0b00000011;
-    
+     else if (turned == BREAK)
+        return 0x00;
+     else if (turned == STOP)
+        return 0xFF;
+
         return 0;
 }
 
-unsigned char convert_speed(unsigned char speed){
-    return speed*speed_K;
-}
 
 void configure_ADC(void)
 {
@@ -170,61 +155,56 @@ unsigned int get_ADC_value(void)
 
 
 void dispos(void){
-    
-    if(STRAIGHT1detected==0){
 
-//        if(STRAIGHT2detected==0){
-//            buggy_turn = fullSTRAIGHT;
-//        }
-//        else
-            buggy_turn = STRAIGHT;
-            if(STRAIGHT1detected==1){       //detecting line break
-                if(LEFTdetected==1 && RIGHTdetected==1){
+    if(STRd == 0 && LEFTd == 0 && RIGHTd == 0){
+        buggy_turn = STOP;
+    }
+
+    else if(STRd == 1){
+        buggy_turn = STRAIGHT;
+            if(STRd == 0){       //detecting line break
+                if(LEFTd == 0 && RIGHTd == 0){
                     buggy_turn = BREAK;
-                    delay();                //how long should it be??
-                    buggy_turn = STOP;
+                    Delay10KTCYx(125);                //0.5s
+                    if(STRd == 0 && LEFTd == 0 && RIGHTd == 0){
+                        buggy_turn = STOP;
+                    }
                 }
             }
     }
 
-    else if(LEFTdetected==0) {
+    else if(LEFTd == 1 && STRd == 1) {
         buggy_turn = LEFT;
     }
-    
-    else if(FLEFTdetected==0){
+
+    else if(LEFTd == 1) {
         buggy_turn = FLEFT;
     }
 
-    else if(RIGHTdetected==0) {
+    else if(RIGHTd == 1 && STRd == 1) {
         buggy_turn = RIGHT;
     }
 
-    else if(FRIGHTdetected==0){
+    else if(RIGHTd == 1) {
         buggy_turn = FRIGHT;
     }
 
 
 }
 
-//unsigned char calc_speed_right(void){
-//    return (60/(N*TIMER3));
-//}
-//
-//unsigned char calc_speed_left(void){
-//    return (60/(N*TIMER1));
-//}
+
 void motors_init(void){
-//	LATG=0X03;				//ENABLE,unipolar,BI
-// 	LATE=0X05;				//DIRECTION1 AND 2
+
 
     TRISGbits.TRISG3 = 0;           //PWM1 output
     TRISGbits.TRISG4 = 0;           //PWM2 output
-    //which values are we writing for directions??
+
     TRISJ = 0x00;
-    LATJ = 0x
+    LATJ = 0b00011010;
 	OpenPWM4(248);                          //frequency of 10k
 	OpenPWM5(248);
 	OpenTimer4( TIMER_INT_OFF & T2_PS_1_1 );
+        OpenTimer2( TIMER_INT_OFF & T2_PS_1_1 );    //just in case
 }
 
 void motors_drive(){
@@ -235,8 +215,6 @@ void motors_drive(){
 void sensors_init(void){
     CCP1CON = 0b0101;     //CCP4 Capture mode for speed, rising edge
     CCP3CON = 0b0101;
-
-
 
     OpenTimer1( TIMER_INT_OFF &
                 T1_8BIT_RW &
@@ -256,11 +234,10 @@ void sensors_init(void){
                 T12_CCP12_T34_CCP345
                 );
 
-
-//ports as inputs
+    //ports as inputs
     TRISCbits.TRISC2 = 1;
     TRISGbits.TRISG0 = 1;
-    TRISB=0xFF;                 //inputs for front sensors
+    TRISE=0xFF;                 //inputs for front sensors
 
     INTCONbits.PEIE = 1;	// Enable peripheral interrupt
     INTCONbits.GIE = 1;		// Enable global interrupt
