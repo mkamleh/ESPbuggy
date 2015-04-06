@@ -71,7 +71,7 @@ void motors_drive(void){
 }
 
 void front_sensors(void){
-    right = (PORTJbits.RJ3 & 0x01);
+    right = (PORTJbits.RJ3 & 0x01);//r u sure this is right because it will be always zero and the same for str
     str = (PORTJbits.RJ2 & 0x01);
     left = (PORTJbits.RJ1 & 0x01);
 }
